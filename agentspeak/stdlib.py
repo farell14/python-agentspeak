@@ -299,7 +299,10 @@ def _abolish(agent, term, intention):
     group = agent.beliefs[pattern.literal_group()]
 
     for old_belief in list(group):
-        if agentspeak.unifies_annotated(old_belief, pattern):
+        # Pattern first: an annotation-free pattern must match beliefs
+        # regardless of what annotations they carry (consistent with
+        # remove_belief/TermQuery), not the other way around.
+        if agentspeak.unifies_annotated(pattern, old_belief):
             group.remove(old_belief)
 
     yield

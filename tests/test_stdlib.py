@@ -32,6 +32,25 @@ class StdlibTest(unittest.TestCase):
 
         self.assertEqual(X.grounded(intention.scope), (1, 2, 3))
 
+    def test_abolish_matches_beliefs_regardless_of_extra_annotations(self):
+        # .abolish(b(X, X)) has no annotation filter, so it must remove
+        # matching beliefs no matter what annotations they actually carry.
+        env = agentspeak.runtime.Environment()
+        agent = agentspeak.runtime.Agent(env, "agent")
+        intention = agentspeak.runtime.Intention()
+
+        source_percept = agentspeak.Literal("source", (agentspeak.Literal("percept"), ))
+        b22 = agentspeak.Literal("b", (2, 2), frozenset([source_percept]))
+        b34 = agentspeak.Literal("b", (3, 4), frozenset([source_percept]))
+        agent.beliefs[("b", 2)].add(b22)
+        agent.beliefs[("b", 2)].add(b34)
+
+        X = agentspeak.Var()
+        term = agentspeak.Literal(".abolish", (agentspeak.Literal("b", (X, X)), ))
+        next(agentspeak.stdlib._abolish(agent, term, intention))
+
+        self.assertEqual(agent.beliefs[("b", 2)], {b34})
+
     def test_current_intention(self):
         env = agentspeak.runtime.Environment()
         agent = agentspeak.runtime.Agent(env, "agent")
