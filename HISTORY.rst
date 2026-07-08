@@ -2,6 +2,22 @@
 History
 =======
 
+0.3.0 (2026-07-07)
+------------------
+
+* Published as ``py-agentspeak`` (this fork continues from
+  ``agentspeak`` 0.2.2; see README for why).
+* Added BDI introspection/control actions: ``.current_intention``,
+  ``.intend``, ``.drop_intention``, ``.succeed_goal``,
+  ``.drop_all_intentions``.
+* Added plan library manipulation actions: ``.add_plan``,
+  ``.remove_plan``, ``.relevant_plans``, ``.plan_label``.
+* Added ``.send(Receiver, askOne, Query, Answer)`` and
+  ``.send(Receiver, askAll, Query, Answer)``.
+* Fixed a non-deterministic belief matching bug in ``.abolish`` that
+  could silently leave annotated beliefs in the belief base.
+* Switched packaging to ``pyproject.toml``.
+
 0.2.2 (2024-03-21)
 ------------------
 

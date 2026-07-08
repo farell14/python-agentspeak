@@ -6,6 +6,6 @@ venv*/
 
 dist/
 build/
-agentspeak.egg-info/
+*.egg-info/
 docs/_build/
 .vscode/launch.json

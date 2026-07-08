@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "py-agentspeak"
+version = "0.3.0"
+description = "Jason-style AgentSpeak for Python. Fork of niklasf/python-agentspeak, a Python interpreter for the Jason (jason-lang.github.io) agent-oriented programming language."
+readme = "README.rst"
+license = { text = "GPL-3.0" }
+authors = [
+    { name = "Niklas Fiekas", email = "niklas.fiekas@tu-clausthal.de" },
+]
+maintainers = [
+    { name = "Julio", email = "farell141@gmail.com" },
+]
+requires-python = ">=3.8"
+dependencies = [
+    "colorama",
+]
+keywords = ["jason", "multi-agent", "simulation", "agentspeak", "bdi"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Interpreters",
+    "Topic :: Software Development :: Libraries",
+]
+
+[project.urls]
+Homepage = "https://github.com/farell14/python-agentspeak"
+Repository = "https://github.com/farell14/python-agentspeak"
+Changelog = "https://github.com/farell14/python-agentspeak/blob/master/HISTORY.rst"
+
+[tool.setuptools]
+packages = ["agentspeak"]

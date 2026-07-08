@@ -1,27 +1,38 @@
 Jason-style AgentSpeak for Python
 =================================
-.. image:: https://img.shields.io/pypi/v/agentspeak.svg
-    :target: https://pypi.python.org/pypi/agentspeak
+.. image:: https://img.shields.io/pypi/v/py-agentspeak.svg
+    :target: https://pypi.org/project/py-agentspeak/
 
-.. image:: https://img.shields.io/pypi/pyversions/agentspeak.svg
-    :target: https://pypi.python.org/pypi/agentspeak
+.. image:: https://img.shields.io/pypi/pyversions/py-agentspeak.svg
+    :target: https://pypi.org/project/py-agentspeak/
 
-.. image:: https://img.shields.io/pypi/l/agentspeak
+.. image:: https://img.shields.io/pypi/l/py-agentspeak
     :target: https://opensource.org/licenses/gpl-3-0
     :alt: GPL 3 License
 
-.. image:: https://pepy.tech/badge/agentspeak
-    :target: https://pepy.tech/project/agentspeak
-    :alt: Downloads
 
-.. image:: https://img.shields.io/pypi/format/agentspeak.svg
-    :target: https://pypi.python.org/pypi/agentspeak
+Origin / Origen
+----------------
 
+**English.** This package is a Python interpreter for AgentSpeak, the
+agent-oriented programming language used by `Jason <https://jason-lang.github.io/>`_,
+a well-known BDI (belief-desire-intention) multi-agent platform written in
+Java. It is a fork of `niklasf/python-agentspeak
+<https://github.com/niklasf/python-agentspeak>`_ (previously published on
+PyPI as ``agentspeak``), maintained at
+`farell14/python-agentspeak <https://github.com/farell14/python-agentspeak>`_
+and published here as ``py-agentspeak`` while changes make their way back
+upstream.
 
-
-A Python-based interpreter for the agent-oriented programming language JASON.
-
-`python-agentspeak` is a Python-based interpreter for the agent-oriented programming language JASON. This library makes it easy to create and manage intelligent agents, offering syntax and functionalities similar to JASON in a Python environment.
+**Español.** Este paquete es un intérprete en Python de AgentSpeak, el
+lenguaje de programación orientado a agentes que usa `Jason
+<https://jason-lang.github.io/>`_, una conocida plataforma multi-agente BDI
+(creencias-deseos-intenciones) escrita en Java. Es un fork de
+`niklasf/python-agentspeak <https://github.com/niklasf/python-agentspeak>`_
+(publicado antes en PyPI como ``agentspeak``), mantenido en
+`farell14/python-agentspeak <https://github.com/farell14/python-agentspeak>`_
+y publicado aquí como ``py-agentspeak`` mientras los cambios llegan al
+repositorio original.
 
 Key Features
 ------------
@@ -29,20 +40,29 @@ Key Features
 * Easy integration with existing Python code
 * Support for complex agent constructions
 
-Setup
------
+Setup / Instalación
+--------------------
+
+**English:**
 
 .. code::
 
-    pip install agentspeak
+    pip install py-agentspeak
 
-Requirements
-------------
-* Python 3.6 or higher
-* Additional dependencies are automatically installed
+**Español:**
 
-Usage example
--------------
+.. code::
+
+    pip install py-agentspeak
+
+Requirements / Requisitos
+--------------------------
+* Python 3.8 or higher / Python 3.8 o superior
+* Additional dependencies are automatically installed / Las dependencias
+  adicionales se instalan automáticamente
+
+Usage example / Ejemplo de uso
+--------------------------------
 
 .. code::
 
@@ -51,10 +71,10 @@ Usage example
     +!hello_world <-
       .print("Hello world!").
 
-Usage
------
+Usage / Uso
+------------
 
-Run a standalone agent program:
+**English.** Run a standalone agent program:
 
 .. code::
 
@@ -68,6 +88,21 @@ Run an interactive console:
 
 See :code:`examples/embedded` for an example that interfaces with custom
 Python code.
+
+**Español.** Ejecutar un programa de agente independiente:
+
+.. code::
+
+    $ python -m agentspeak examples/hello_world.asl
+
+Ejecutar una consola interactiva:
+
+.. code::
+
+    $ python -m agentspeak
+
+Revisa :code:`examples/embedded` para un ejemplo de integración con código
+Python propio.
 
 Jason compability
 -----------------
@@ -99,4 +134,4 @@ python-agentspeak should be mostly equivalent to Jason_.
 * Literals are only comparable if they have the same signature.
 
 
-.. _Jason: http://jason.sourceforge.net/
+.. _Jason: https://jason-lang.github.io/

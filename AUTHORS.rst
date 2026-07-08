@@ -7,6 +7,11 @@ Development Lead
 
 * Niklas Fiekas <niklas.fiekas@tu-clausthal.de>
 
+Maintainer of this fork (``py-agentspeak``)
+--------------------------------------------
+
+* Julio <https://github.com/farell14>
+
 Contributors
 ------------
 
