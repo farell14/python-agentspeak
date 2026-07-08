@@ -38,17 +38,11 @@ LOGGER = agentspeak.get_logger(__name__)
 #   - .relevant_plans
 #   - .remove_plan
 # * BDI
-#   - .current_intention
-#   - .desire
-#   - .drop_all_desires
-#   - .drop_all_events
-#   - .drop_all_intentions
-#   - .drop_desire
-#   - .drop_event
-#   - .drop_intention
-#   - .fail_goal
-#   - .intend
-#   - .succeed_goal
+#   - .fail_goal, .drop_event, .drop_all_events, .desire, .drop_desire,
+#     .drop_all_desires: unlike Jason, this runtime resolves events into
+#     intentions immediately instead of keeping a separate pending-event
+#     queue, so there is nothing distinct from an intention to inspect or
+#     drop here. Would require modeling that queue first.
 #   - .add_anot
 #   - .at
 #   - .create_agent
@@ -313,6 +307,73 @@ def _abolish(agent, term, intention):
         if agentspeak.unifies_annotated(old_belief, pattern):
             group.remove(old_belief)
 
+    yield
+
+
+def _top_frames(agent):
+    """Yields (intention_stack, top_frame) for every non-empty intention."""
+    for intention_stack in agent.intentions:
+        if intention_stack and intention_stack[-1].head_term is not None:
+            yield intention_stack, intention_stack[-1]
+
+
+@actions.add(".current_intention", 1)
+@agentspeak.optimizer.function_like
+def _current_intention(agent, term, intention):
+    # The goal of the plan currently running this action, i.e. the top of
+    # the calling intention's own stack of frames.
+    if intention.head_term is None:
+        return
+
+    if agentspeak.unify(term.args[0], intention.head_term, intention.scope, intention.stack):
+        yield
+
+
+@actions.add(".intend", 1)
+@agentspeak.optimizer.function_like
+def _intend(agent, term, intention):
+    choicepoint = object()
+
+    for _, frame in _top_frames(agent):
+        intention.stack.append(choicepoint)
+
+        if agentspeak.unify(term.args[0], frame.head_term, intention.scope, intention.stack):
+            yield
+
+        agentspeak.reroll(intention.scope, intention.stack, choicepoint)
+
+
+@actions.add(".drop_intention", 1)
+# TODO: Inform optimizer.
+def _drop_intention(agent, term, intention):
+    goal = agentspeak.freeze(term.args[0], intention.scope, {})
+
+    for intention_stack, frame in list(_top_frames(agent)):
+        if goal.functor == frame.head_term.functor and agentspeak.unifies(goal.args, frame.head_term.args):
+            intention_stack.remove(frame)
+            yield
+            return
+
+
+@actions.add(".succeed_goal", 1)
+# TODO: Inform optimizer.
+def _succeed_goal(agent, term, intention):
+    goal = agentspeak.freeze(term.args[0], intention.scope, {})
+
+    for _, frame in _top_frames(agent):
+        if goal.functor == frame.head_term.functor and agentspeak.unifies(goal.args, frame.head_term.args):
+            # Same effect as a plan body running out of instructions: the
+            # next step() call performs the normal success path, including
+            # back-unification with the calling intention.
+            frame.instr = None
+            yield
+            return
+
+
+@actions.add(".drop_all_intentions", 0)
+# TODO: Inform optimizer.
+def _drop_all_intentions(agent, term, intention):
+    agent.intentions.clear()
     yield
 
 
