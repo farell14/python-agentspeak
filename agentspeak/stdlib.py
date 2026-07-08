@@ -32,23 +32,12 @@ LOGGER = agentspeak.get_logger(__name__)
 
 
 # TODO:
-# * Plan Library Manipulation
-#   - .add_plan
-#   - .plan_label
-#   - .relevant_plans
-#   - .remove_plan
 # * BDI
-#   - .current_intention
-#   - .desire
-#   - .drop_all_desires
-#   - .drop_all_events
-#   - .drop_all_intentions
-#   - .drop_desire
-#   - .drop_event
-#   - .drop_intention
-#   - .fail_goal
-#   - .intend
-#   - .succeed_goal
+#   - .fail_goal, .drop_event, .drop_all_events, .desire, .drop_desire,
+#     .drop_all_desires: unlike Jason, this runtime resolves events into
+#     intentions immediately instead of keeping a separate pending-event
+#     queue, so there is nothing distinct from an intention to inspect or
+#     drop here. Would require modeling that queue first.
 #   - .add_anot
 #   - .at
 #   - .create_agent
@@ -92,18 +81,24 @@ def _broadcast(agent, term, intention):
     yield
 
 
-@actions.add(".send", 3)
-def _send(agent, term, intention):
+def _resolve_receivers(agent, arg, scope):
     # Find the receivers: By a string, atom or list of strings or atoms.
-    receivers = agentspeak.grounded(term.args[0], intention.scope)
+    receivers = agentspeak.grounded(arg, scope)
     if not agentspeak.is_list(receivers):
         receivers = [receivers]
+
     receiving_agents = []
     for receiver in receivers:
         if agentspeak.is_atom(receiver):
             receiving_agents.append(agent.env.agents[receiver.functor])
         else:
             receiving_agents.append(agent.env.agents[receiver])
+    return receiving_agents
+
+
+@actions.add(".send", 3)
+def _send(agent, term, intention):
+    receiving_agents = _resolve_receivers(agent, term.args[0], intention.scope)
 
     # Illocutionary force.
     ilf = agentspeak.grounded(term.args[1], intention.scope)
@@ -133,13 +128,12 @@ def _send(agent, term, intention):
     else:
         raise agentspeak.AslError("unknown illocutionary force: %s" % ilf)
 
-    # TODO: askOne, askAll
     # Prepare message. The message is either a plain text or a structured message.
     if ilf.functor in ["tellHow", "askHow", "untellHow"]:
         message = agentspeak.Literal("plain_text", (term.args[2], ), frozenset())
     else:
         message = agentspeak.freeze(term.args[2], intention.scope, {})
-    
+
     tagged_message = message.with_annotation(
         agentspeak.Literal("source", (agentspeak.Literal(agent.name), )))
 
@@ -148,6 +142,44 @@ def _send(agent, term, intention):
         receiver.call(trigger, goal_type, tagged_message, agentspeak.runtime.Intention())
 
     yield
+
+
+@actions.add(".send", 4)
+def _send_ask(agent, term, intention):
+    # askOne/askAll: unlike the other performatives, these query the
+    # receiver's belief base directly and bind the answer in this same
+    # step, instead of dispatching an event to the receiver's plans.
+    receiving_agents = _resolve_receivers(agent, term.args[0], intention.scope)
+
+    ilf = agentspeak.grounded(term.args[1], intention.scope)
+    if not agentspeak.is_atom(ilf):
+        return
+
+    pattern = term.args[2]
+    query = agentspeak.runtime.TermQuery(pattern)
+    memo = {}
+
+    if ilf.functor == "askOne":
+        answer = False
+        for receiver in receiving_agents:
+            for _ in query.execute(receiver, intention):
+                answer = agentspeak.freeze(pattern, intention.scope, memo)
+                break
+            if answer is not False:
+                break
+
+        if agentspeak.unify(term.args[3], answer, intention.scope, intention.stack):
+            yield
+    elif ilf.functor == "askAll":
+        answers = []
+        for receiver in receiving_agents:
+            for _ in query.execute(receiver, intention):
+                answers.append(agentspeak.freeze(pattern, intention.scope, memo))
+
+        if agentspeak.unify(tuple(answers), term.args[3], intention.scope, intention.stack):
+            yield
+    else:
+        raise agentspeak.AslError("unknown illocutionary force: %s" % ilf)
 
 
 COLORS = [(colorama.Back.GREEN, colorama.Fore.WHITE),
@@ -310,10 +342,124 @@ def _abolish(agent, term, intention):
     group = agent.beliefs[pattern.literal_group()]
 
     for old_belief in list(group):
-        if agentspeak.unifies_annotated(old_belief, pattern):
+        # Pattern first: an annotation-free pattern must match beliefs
+        # regardless of what annotations they carry (consistent with
+        # remove_belief/TermQuery), not the other way around.
+        if agentspeak.unifies_annotated(pattern, old_belief):
             group.remove(old_belief)
 
     yield
+
+
+def _top_frames(agent):
+    """Yields (intention_stack, top_frame) for every non-empty intention."""
+    for intention_stack in agent.intentions:
+        if intention_stack and intention_stack[-1].head_term is not None:
+            yield intention_stack, intention_stack[-1]
+
+
+@actions.add(".current_intention", 1)
+@agentspeak.optimizer.function_like
+def _current_intention(agent, term, intention):
+    # The goal of the plan currently running this action, i.e. the top of
+    # the calling intention's own stack of frames.
+    if intention.head_term is None:
+        return
+
+    if agentspeak.unify(term.args[0], intention.head_term, intention.scope, intention.stack):
+        yield
+
+
+@actions.add(".intend", 1)
+@agentspeak.optimizer.function_like
+def _intend(agent, term, intention):
+    choicepoint = object()
+
+    for _, frame in _top_frames(agent):
+        intention.stack.append(choicepoint)
+
+        if agentspeak.unify(term.args[0], frame.head_term, intention.scope, intention.stack):
+            yield
+
+        agentspeak.reroll(intention.scope, intention.stack, choicepoint)
+
+
+@actions.add(".drop_intention", 1)
+# TODO: Inform optimizer.
+def _drop_intention(agent, term, intention):
+    goal = agentspeak.freeze(term.args[0], intention.scope, {})
+
+    for intention_stack, frame in list(_top_frames(agent)):
+        if goal.functor == frame.head_term.functor and agentspeak.unifies(goal.args, frame.head_term.args):
+            intention_stack.remove(frame)
+            yield
+            return
+
+
+@actions.add(".succeed_goal", 1)
+# TODO: Inform optimizer.
+def _succeed_goal(agent, term, intention):
+    goal = agentspeak.freeze(term.args[0], intention.scope, {})
+
+    for _, frame in _top_frames(agent):
+        if goal.functor == frame.head_term.functor and agentspeak.unifies(goal.args, frame.head_term.args):
+            # Same effect as a plan body running out of instructions: the
+            # next step() call performs the normal success path, including
+            # back-unification with the calling intention.
+            frame.instr = None
+            yield
+            return
+
+
+@actions.add(".drop_all_intentions", 0)
+# TODO: Inform optimizer.
+def _drop_all_intentions(agent, term, intention):
+    agent.intentions.clear()
+    yield
+
+
+@actions.add(".add_plan", 1)
+# TODO: Inform optimizer.
+def _add_plan(agent, term, intention):
+    text = asl_str(agentspeak.grounded(term.args[0], intention.scope))
+    agent._tell_how(Literal(".add_plan", (text, )))
+    yield
+
+
+@actions.add(".remove_plan", 1)
+# TODO: Inform optimizer.
+def _remove_plan(agent, term, intention):
+    label = asl_str(agentspeak.grounded(term.args[0], intention.scope))
+    agent._untell_how(Literal(".remove_plan", (label, )))
+    yield
+
+
+@actions.add(".relevant_plans", 2)
+@agentspeak.optimizer.function_like
+def _relevant_plans(agent, term, intention):
+    event_text = asl_str(agentspeak.grounded(term.args[0], intention.scope))
+    log = agentspeak.Log(LOGGER, 1)
+    event = agentspeak.runtime.parse_event_text(event_text, log, "<.relevant_plans>")
+
+    key = (event.trigger, event.goal_type, event.head.functor, len(event.head.args))
+    matches = tuple(agentspeak.runtime.plan_to_str(plan) for plan in agent.plans[key])
+
+    if agentspeak.unify(term.args[1], matches, intention.scope, intention.stack):
+        yield
+
+
+@actions.add(".plan_label", 2)
+@agentspeak.optimizer.function_like
+def _plan_label(agent, term, intention):
+    text = asl_str(agentspeak.grounded(term.args[0], intention.scope))
+    log = agentspeak.Log(LOGGER, 1)
+    plan = agentspeak.runtime.parse_plan_text(text, actions, log)
+
+    if plan.annotation is None:
+        return
+
+    if agentspeak.unify(term.args[1], Literal(plan.annotation.functor), intention.scope, intention.stack):
+        yield
 
 
 @actions.add(".date", 3)
@@ -370,17 +516,8 @@ def _wait(agent, term, intention):
 
     # Event.
     if event is not None:
-        # Parse event.
-        if not event.endswith("."):
-            event += "."
         log = agentspeak.Log(LOGGER, 1)
-        tokens = agentspeak.lexer.TokenStream(agentspeak.StringSource("<.wait>", event), log)
-        tok, ast_event = agentspeak.parser.parse_event(tokens.next(), tokens, log)
-        if tok.lexeme != ".":
-            raise log.error("expected no further tokens after event for .wait, got: '%s'", tok.lexeme, loc=tok.loc)
-
-        # Build term.
-        event = ast_event.accept(agentspeak.runtime.BuildEventVisitor(log))
+        event = agentspeak.runtime.parse_event_text(event, log, "<.wait>")
 
     # Timeout.
     if millis is None:
