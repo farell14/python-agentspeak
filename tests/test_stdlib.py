@@ -188,6 +188,75 @@ class StdlibTest(unittest.TestCase):
         with self.assertRaises(StopIteration):
             next(agentspeak.stdlib._plan_label(agent, term2, intention2))
 
+    def test_send_ask_one_found(self):
+        env = agentspeak.runtime.Environment()
+        sender = agentspeak.runtime.Agent(env, "sender")
+        receiver = agentspeak.runtime.Agent(env, "receiver")
+        env.agents["sender"] = sender
+        env.agents["receiver"] = receiver
+
+        receiver.beliefs[("know", 2)].add(
+            agentspeak.Literal("know", (agentspeak.Literal("john"), agentspeak.Literal("paris"))))
+
+        intention = agentspeak.runtime.Intention()
+        Where = agentspeak.Var()
+        Answer = agentspeak.Var()
+        term = agentspeak.Literal(".send", (
+            agentspeak.Literal("receiver"),
+            agentspeak.Literal("askOne"),
+            agentspeak.Literal("know", (agentspeak.Literal("john"), Where)),
+            Answer,
+        ))
+        next(agentspeak.stdlib._send_ask(sender, term, intention))
+
+        self.assertEqual(
+            Answer.grounded(intention.scope),
+            agentspeak.Literal("know", (agentspeak.Literal("john"), agentspeak.Literal("paris"))))
+
+    def test_send_ask_one_not_found(self):
+        env = agentspeak.runtime.Environment()
+        sender = agentspeak.runtime.Agent(env, "sender")
+        receiver = agentspeak.runtime.Agent(env, "receiver")
+        env.agents["sender"] = sender
+        env.agents["receiver"] = receiver
+
+        intention = agentspeak.runtime.Intention()
+        Answer = agentspeak.Var()
+        term = agentspeak.Literal(".send", (
+            agentspeak.Literal("receiver"),
+            agentspeak.Literal("askOne"),
+            agentspeak.Literal("know", (agentspeak.Literal("john"), agentspeak.Var())),
+            Answer,
+        ))
+        next(agentspeak.stdlib._send_ask(sender, term, intention))
+
+        self.assertIs(Answer.grounded(intention.scope), False)
+
+    def test_send_ask_all(self):
+        env = agentspeak.runtime.Environment()
+        sender = agentspeak.runtime.Agent(env, "sender")
+        receiver = agentspeak.runtime.Agent(env, "receiver")
+        env.agents["sender"] = sender
+        env.agents["receiver"] = receiver
+
+        receiver.beliefs[("know", 2)].add(
+            agentspeak.Literal("know", (agentspeak.Literal("john"), agentspeak.Literal("paris"))))
+        receiver.beliefs[("know", 2)].add(
+            agentspeak.Literal("know", (agentspeak.Literal("john"), agentspeak.Literal("berlin"))))
+
+        intention = agentspeak.runtime.Intention()
+        Where = agentspeak.Var()
+        Answers = agentspeak.Var()
+        term = agentspeak.Literal(".send", (
+            agentspeak.Literal("receiver"),
+            agentspeak.Literal("askAll"),
+            agentspeak.Literal("know", (agentspeak.Literal("john"), Where)),
+            Answers,
+        ))
+        next(agentspeak.stdlib._send_ask(sender, term, intention))
+
+        self.assertEqual(len(Answers.grounded(intention.scope)), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

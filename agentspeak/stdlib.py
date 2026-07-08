@@ -81,18 +81,24 @@ def _broadcast(agent, term, intention):
     yield
 
 
-@actions.add(".send", 3)
-def _send(agent, term, intention):
+def _resolve_receivers(agent, arg, scope):
     # Find the receivers: By a string, atom or list of strings or atoms.
-    receivers = agentspeak.grounded(term.args[0], intention.scope)
+    receivers = agentspeak.grounded(arg, scope)
     if not agentspeak.is_list(receivers):
         receivers = [receivers]
+
     receiving_agents = []
     for receiver in receivers:
         if agentspeak.is_atom(receiver):
             receiving_agents.append(agent.env.agents[receiver.functor])
         else:
             receiving_agents.append(agent.env.agents[receiver])
+    return receiving_agents
+
+
+@actions.add(".send", 3)
+def _send(agent, term, intention):
+    receiving_agents = _resolve_receivers(agent, term.args[0], intention.scope)
 
     # Illocutionary force.
     ilf = agentspeak.grounded(term.args[1], intention.scope)
@@ -122,13 +128,12 @@ def _send(agent, term, intention):
     else:
         raise agentspeak.AslError("unknown illocutionary force: %s" % ilf)
 
-    # TODO: askOne, askAll
     # Prepare message. The message is either a plain text or a structured message.
     if ilf.functor in ["tellHow", "askHow", "untellHow"]:
         message = agentspeak.Literal("plain_text", (term.args[2], ), frozenset())
     else:
         message = agentspeak.freeze(term.args[2], intention.scope, {})
-    
+
     tagged_message = message.with_annotation(
         agentspeak.Literal("source", (agentspeak.Literal(agent.name), )))
 
@@ -137,6 +142,44 @@ def _send(agent, term, intention):
         receiver.call(trigger, goal_type, tagged_message, agentspeak.runtime.Intention())
 
     yield
+
+
+@actions.add(".send", 4)
+def _send_ask(agent, term, intention):
+    # askOne/askAll: unlike the other performatives, these query the
+    # receiver's belief base directly and bind the answer in this same
+    # step, instead of dispatching an event to the receiver's plans.
+    receiving_agents = _resolve_receivers(agent, term.args[0], intention.scope)
+
+    ilf = agentspeak.grounded(term.args[1], intention.scope)
+    if not agentspeak.is_atom(ilf):
+        return
+
+    pattern = term.args[2]
+    query = agentspeak.runtime.TermQuery(pattern)
+    memo = {}
+
+    if ilf.functor == "askOne":
+        answer = False
+        for receiver in receiving_agents:
+            for _ in query.execute(receiver, intention):
+                answer = agentspeak.freeze(pattern, intention.scope, memo)
+                break
+            if answer is not False:
+                break
+
+        if agentspeak.unify(term.args[3], answer, intention.scope, intention.stack):
+            yield
+    elif ilf.functor == "askAll":
+        answers = []
+        for receiver in receiving_agents:
+            for _ in query.execute(receiver, intention):
+                answers.append(agentspeak.freeze(pattern, intention.scope, memo))
+
+        if agentspeak.unify(tuple(answers), term.args[3], intention.scope, intention.stack):
+            yield
+    else:
+        raise agentspeak.AslError("unknown illocutionary force: %s" % ilf)
 
 
 COLORS = [(colorama.Back.GREEN, colorama.Fore.WHITE),

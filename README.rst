@@ -89,8 +89,11 @@ python-agentspeak should be mostly equivalent to Jason_.
   :code:`.drop_all_desires`), and agent lifecycle actions
   (:code:`.create_agent`, :code:`.kill_agent`, :code:`.at`,
   :code:`.perceive`).
-* :code:`.send` does not yet support the :code:`askOne`/:code:`askAll`
-  performatives.
+* :code:`.send(Receiver, askOne, Query, Answer)` and
+  :code:`.send(Receiver, askAll, Query, Answer)` query the receiver's
+  belief base directly and bind the answer in the same reasoning
+  step, rather than actually dispatching an asynchronous message and
+  suspending the sender until a reply arrives.
 * Jason 2.0 fork join operators are tokenized by the lexer but not yet
   parsed/supported.
 * Literals are only comparable if they have the same signature.
