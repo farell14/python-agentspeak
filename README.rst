@@ -82,11 +82,10 @@ python-agentspeak should be mostly equivalent to Jason_.
 * Standard library contains some, but not all, introspective and
   plan-manipulation actions. Implemented: :code:`.current_intention`,
   :code:`.intend`, :code:`.drop_intention`, :code:`.succeed_goal`,
-  :code:`.drop_all_intentions`. Not yet implemented: plan library
-  manipulation (:code:`.add_plan`, :code:`.remove_plan`,
-  :code:`.relevant_plans`, :code:`.plan_label`), :code:`.fail_goal`,
-  event/desire introspection (:code:`.desire`, :code:`.drop_event`,
-  :code:`.drop_all_events`, :code:`.drop_desire`,
+  :code:`.drop_all_intentions`, :code:`.add_plan`, :code:`.remove_plan`,
+  :code:`.relevant_plans`, :code:`.plan_label`. Not yet implemented:
+  :code:`.fail_goal`, event/desire introspection (:code:`.desire`,
+  :code:`.drop_event`, :code:`.drop_all_events`, :code:`.drop_desire`,
   :code:`.drop_all_desires`), and agent lifecycle actions
   (:code:`.create_agent`, :code:`.kill_agent`, :code:`.at`,
   :code:`.perceive`).

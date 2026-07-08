@@ -100,6 +100,75 @@ class StdlibTest(unittest.TestCase):
 
         self.assertEqual(len(agent.intentions), 0)
 
+    def test_add_plan(self):
+        env = agentspeak.runtime.Environment()
+        agent = agentspeak.runtime.Agent(env, "agent")
+        intention = agentspeak.runtime.Intention()
+
+        term = agentspeak.Literal(".add_plan", ('+!greet <- .print("hi").', ))
+        next(agentspeak.stdlib._add_plan(agent, term, intention))
+
+        key = (agentspeak.Trigger.addition, agentspeak.GoalType.achievement, "greet", 0)
+        self.assertEqual(len(agent.plans[key]), 1)
+
+    def test_remove_plan(self):
+        env = agentspeak.runtime.Environment()
+        agent = agentspeak.runtime.Agent(env, "agent")
+        intention = agentspeak.runtime.Intention()
+
+        add_term = agentspeak.Literal(".add_plan", ('@my_label +!greet <- .print("hi").', ))
+        next(agentspeak.stdlib._add_plan(agent, add_term, intention))
+
+        key = (agentspeak.Trigger.addition, agentspeak.GoalType.achievement, "greet", 0)
+        self.assertEqual(len(agent.plans[key]), 1)
+
+        remove_term = agentspeak.Literal(".remove_plan", ("@my_label", ))
+        next(agentspeak.stdlib._remove_plan(agent, remove_term, intention))
+
+        self.assertEqual(len(agent.plans[key]), 0)
+
+    def test_relevant_plans(self):
+        env = agentspeak.runtime.Environment()
+        agent = agentspeak.runtime.Agent(env, "agent")
+        intention = agentspeak.runtime.Intention()
+
+        add_term = agentspeak.Literal(".add_plan", ('+!greet(X) <- .print(X).', ))
+        next(agentspeak.stdlib._add_plan(agent, add_term, intention))
+
+        LP = agentspeak.Var()
+        term = agentspeak.Literal(".relevant_plans", ("+!greet(_)", LP))
+        next(agentspeak.stdlib._relevant_plans(agent, term, intention))
+
+        plans = LP.grounded(intention.scope)
+        self.assertEqual(len(plans), 1)
+        self.assertIn("greet", plans[0])
+
+        # Calling it again must not blow up (plan_to_str used to mutate
+        # plan.args, breaking on a second call for the same plan).
+        intention2 = agentspeak.runtime.Intention()
+        LP2 = agentspeak.Var()
+        term2 = agentspeak.Literal(".relevant_plans", ("+!greet(_)", LP2))
+        next(agentspeak.stdlib._relevant_plans(agent, term2, intention2))
+        self.assertEqual(LP2.grounded(intention2.scope), plans)
+
+    def test_plan_label(self):
+        env = agentspeak.runtime.Environment()
+        agent = agentspeak.runtime.Agent(env, "agent")
+        intention = agentspeak.runtime.Intention()
+
+        Label = agentspeak.Var()
+        term = agentspeak.Literal(".plan_label", ('@my_label +!greet <- .print("hi").', Label))
+        next(agentspeak.stdlib._plan_label(agent, term, intention))
+
+        self.assertEqual(Label.grounded(intention.scope), agentspeak.Literal("my_label"))
+
+        # An unlabeled plan yields nothing.
+        intention2 = agentspeak.runtime.Intention()
+        Label2 = agentspeak.Var()
+        term2 = agentspeak.Literal(".plan_label", ('+!greet <- .print("hi").', Label2))
+        with self.assertRaises(StopIteration):
+            next(agentspeak.stdlib._plan_label(agent, term2, intention2))
+
 
 if __name__ == "__main__":
     unittest.main()

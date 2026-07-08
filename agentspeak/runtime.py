@@ -506,46 +506,7 @@ class Agent:
         """
             tellHow is a performative that allows the agent to add a plan to another agent.
         """
-        str_plan = term.args[0]
-
-        tokens = []
-        # extend tokens with the tokens of the string plan
-        tokens.extend(agentspeak.lexer.tokenize(agentspeak.StringSource("<stdin>", str_plan), agentspeak.Log(LOGGER), 1))
-
-        # Prepare the conversion from tokens to AstPlan
-        first_token = tokens[0]
-        log = agentspeak.Log(LOGGER)
-        tokens.pop(0)
-        tokens = iter(tokens)
-
-        # Converts the list of tokens to an Astplan
-        if first_token.lexeme in ["@", "+", "-"]:
-            tok, ast_plan = agentspeak.parser.parse_plan(first_token, tokens, log)
-            if tok.lexeme != ".":
-                raise log.error("", tok, "expected end of plan")
-
-        # Prepare the conversion of Astplan to Plan
-        variables = {}
-        actions = agentspeak.stdlib.actions
-
-        head = ast_plan.event.head.accept(BuildTermVisitor(variables))
-
-        if ast_plan.context:
-            context = ast_plan.context.accept(BuildQueryVisitor(variables, actions, log))
-        else:
-            context = TrueQuery()
-
-        body = Instruction(noop)
-        body.f = noop
-        if ast_plan.body:
-            ast_plan.body.accept(BuildInstructionsVisitor(variables, actions, body, log))
-
-        # Converts the Astplan to Plan
-            
-        plan = Plan(ast_plan.event.trigger, ast_plan.event.goal_type, head, context, body, ast_plan.body, ast_plan.annotation)
-        
-        plan.args = [str(i) for i in ast_plan.event.head.terms] + [str(j) for i in ast_plan.event.head.annotations for j in i.terms]
-
+        plan = parse_plan_text(term.args[0], agentspeak.stdlib.actions, agentspeak.Log(LOGGER))
         self.add_plan(plan)
 
     def _call_ask_how(self, receiver, message, intention):
@@ -736,12 +697,15 @@ def plan_to_str(plan):
         context = "true"
     else:
         context = plan.context
-    
+
     body = plan.str_body
 
     if len(plan.head.args):
+        # Use a copy: plan.args is also needed by any later call (e.g.
+        # .relevant_plans can be asked about the same plan more than once).
+        placeholders = list(plan.args)
         pattern = r"_X_[0-9a-fA-F]{3}_[0-9a-fA-F]+"
-        head = re.sub(pattern, lambda m: plan.args.pop(0), str(plan.head))
+        head = re.sub(pattern, lambda m: placeholders.pop(0), str(plan.head))
     else:
         head = str(plan.head)
 
@@ -752,6 +716,52 @@ def plan_to_str(plan):
         return  f"{plan.trigger.value}{plan.goal_type.value}{head} : {context} <- {body}."
 
     return f"@{label} {plan.trigger.value}{plan.goal_type.value}{head} : {context} <- {body}."
+
+
+def parse_plan_text(text, actions, log):
+    """Parses a single plan (as produced by .print/tellHow/.add_plan) into a Plan."""
+    tokens = agentspeak.lexer.tokenize(agentspeak.StringSource("<plan text>", text), log, 1)
+    tokens = list(tokens)
+
+    first_token = tokens[0]
+    tokens = iter(tokens[1:])
+
+    if first_token.lexeme not in ["@", "+", "-"]:
+        raise log.error("expected plan, got: '%s'", first_token.lexeme, loc=first_token.loc)
+
+    tok, ast_plan = agentspeak.parser.parse_plan(first_token, tokens, log)
+    if tok.lexeme != ".":
+        raise log.error("expected end of plan, got: '%s'", tok.lexeme, loc=tok.loc)
+
+    variables = {}
+    head = ast_plan.event.head.accept(BuildTermVisitor(variables))
+
+    if ast_plan.context:
+        context = ast_plan.context.accept(BuildQueryVisitor(variables, actions, log))
+    else:
+        context = TrueQuery()
+
+    body = Instruction(noop)
+    if ast_plan.body:
+        ast_plan.body.accept(BuildInstructionsVisitor(variables, actions, body, log))
+
+    plan = Plan(ast_plan.event.trigger, ast_plan.event.goal_type, head, context, body, ast_plan.body, ast_plan.annotation)
+    plan.args = [str(i) for i in ast_plan.event.head.terms] + [str(j) for i in ast_plan.event.head.annotations for j in i.terms]
+
+    return plan
+
+
+def parse_event_text(text, log, source_name="<event text>"):
+    """Parses a trigger event (as used by .wait and .relevant_plans) into an Event."""
+    if not text.endswith("."):
+        text += "."
+
+    tokens = agentspeak.lexer.TokenStream(agentspeak.StringSource(source_name, text), log)
+    tok, ast_event = agentspeak.parser.parse_event(tokens.next(), tokens, log)
+    if tok.lexeme != ".":
+        raise log.error("expected no further tokens after event, got: '%s'", tok.lexeme, loc=tok.loc)
+
+    return ast_event.accept(BuildEventVisitor(log))
 
 
 class Environment:

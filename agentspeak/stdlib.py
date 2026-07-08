@@ -32,11 +32,6 @@ LOGGER = agentspeak.get_logger(__name__)
 
 
 # TODO:
-# * Plan Library Manipulation
-#   - .add_plan
-#   - .plan_label
-#   - .relevant_plans
-#   - .remove_plan
 # * BDI
 #   - .fail_goal, .drop_event, .drop_all_events, .desire, .drop_desire,
 #     .drop_all_desires: unlike Jason, this runtime resolves events into
@@ -377,6 +372,50 @@ def _drop_all_intentions(agent, term, intention):
     yield
 
 
+@actions.add(".add_plan", 1)
+# TODO: Inform optimizer.
+def _add_plan(agent, term, intention):
+    text = asl_str(agentspeak.grounded(term.args[0], intention.scope))
+    agent._tell_how(Literal(".add_plan", (text, )))
+    yield
+
+
+@actions.add(".remove_plan", 1)
+# TODO: Inform optimizer.
+def _remove_plan(agent, term, intention):
+    label = asl_str(agentspeak.grounded(term.args[0], intention.scope))
+    agent._untell_how(Literal(".remove_plan", (label, )))
+    yield
+
+
+@actions.add(".relevant_plans", 2)
+@agentspeak.optimizer.function_like
+def _relevant_plans(agent, term, intention):
+    event_text = asl_str(agentspeak.grounded(term.args[0], intention.scope))
+    log = agentspeak.Log(LOGGER, 1)
+    event = agentspeak.runtime.parse_event_text(event_text, log, "<.relevant_plans>")
+
+    key = (event.trigger, event.goal_type, event.head.functor, len(event.head.args))
+    matches = tuple(agentspeak.runtime.plan_to_str(plan) for plan in agent.plans[key])
+
+    if agentspeak.unify(term.args[1], matches, intention.scope, intention.stack):
+        yield
+
+
+@actions.add(".plan_label", 2)
+@agentspeak.optimizer.function_like
+def _plan_label(agent, term, intention):
+    text = asl_str(agentspeak.grounded(term.args[0], intention.scope))
+    log = agentspeak.Log(LOGGER, 1)
+    plan = agentspeak.runtime.parse_plan_text(text, actions, log)
+
+    if plan.annotation is None:
+        return
+
+    if agentspeak.unify(term.args[1], Literal(plan.annotation.functor), intention.scope, intention.stack):
+        yield
+
+
 @actions.add(".date", 3)
 @agentspeak.optimizer.side_effect(
     agentspeak.optimizer.InferenceEvilnessConst.AFFECT_PARAM_ALL,
@@ -431,17 +470,8 @@ def _wait(agent, term, intention):
 
     # Event.
     if event is not None:
-        # Parse event.
-        if not event.endswith("."):
-            event += "."
         log = agentspeak.Log(LOGGER, 1)
-        tokens = agentspeak.lexer.TokenStream(agentspeak.StringSource("<.wait>", event), log)
-        tok, ast_event = agentspeak.parser.parse_event(tokens.next(), tokens, log)
-        if tok.lexeme != ".":
-            raise log.error("expected no further tokens after event for .wait, got: '%s'", tok.lexeme, loc=tok.loc)
-
-        # Build term.
-        event = ast_event.accept(agentspeak.runtime.BuildEventVisitor(log))
+        event = agentspeak.runtime.parse_event_text(event, log, "<.wait>")
 
     # Timeout.
     if millis is None:
